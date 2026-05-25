@@ -21,8 +21,9 @@ echo "Installing terminology guard scripts to precommit-scripts/..."
 mkdir -p "$SCRIPTS_DIR"
 cp "$PLUGIN_DIR/hooks/terminology/lib-terminology.sh" "$SCRIPTS_DIR/"
 cp "$PLUGIN_DIR/hooks/terminology/check-terminology"  "$SCRIPTS_DIR/"
+cp "$PLUGIN_DIR/hooks/terminology/check-commit-msg"   "$SCRIPTS_DIR/"
 cp "$PLUGIN_DIR/hooks/terminology/scan-history"       "$SCRIPTS_DIR/"
-chmod +x "$SCRIPTS_DIR/check-terminology" "$SCRIPTS_DIR/scan-history"
+chmod +x "$SCRIPTS_DIR/check-terminology" "$SCRIPTS_DIR/check-commit-msg" "$SCRIPTS_DIR/scan-history"
 
 # --- wire .pre-commit-config.yaml (idempotent) ---
 CONFIG="$PROJECT_DIR/.pre-commit-config.yaml"
@@ -32,6 +33,13 @@ HOOK_ENTRY="      - id: terminology-guard
         language: script
         types: [text]"
 
+COMMIT_MSG_HOOK_ENTRY="      - id: terminology-commit-msg
+        name: Terminology Guard (commit message)
+        entry: precommit-scripts/check-commit-msg
+        language: script
+        stages: [commit-msg]"
+
+# Wire terminology-guard (idempotent)
 if [ -f "$CONFIG" ] && grep -q "id: terminology-guard" "$CONFIG" 2>/dev/null; then
   echo "terminology-guard already in .pre-commit-config.yaml, skipping."
 elif [ ! -f "$CONFIG" ]; then
@@ -44,9 +52,6 @@ $HOOK_ENTRY
 EOF
 elif grep -q "repo: local" "$CONFIG" 2>/dev/null; then
   echo "Adding terminology-guard to existing repo: local block..."
-  # Append the hook entry after the last line of the repo: local block.
-  # Strategy: find the line number of "repo: local", then find the last
-  # non-blank line before the next "- repo:" or EOF, and insert after it.
   python3 -c "
 import re, sys
 
@@ -67,7 +72,6 @@ if local_idx is None:
 insert_at = len(lines)
 for i in range(local_idx + 1, len(lines)):
     if re.match(r'\s*- repo:', lines[i]):
-        # Back up past any blank lines
         insert_at = i
         while insert_at > local_idx and lines[insert_at - 1].strip() == '':
             insert_at -= 1
@@ -95,6 +99,56 @@ $HOOK_ENTRY
 EOF
 fi
 
+# Wire terminology-commit-msg (idempotent)
+if [ -f "$CONFIG" ] && grep -q "id: terminology-commit-msg" "$CONFIG" 2>/dev/null; then
+  echo "terminology-commit-msg already in .pre-commit-config.yaml, skipping."
+elif grep -q "repo: local" "$CONFIG" 2>/dev/null; then
+  echo "Adding terminology-commit-msg to existing repo: local block..."
+  python3 -c "
+import re, sys
+
+with open('$CONFIG') as f:
+    lines = f.readlines()
+
+local_idx = None
+for i, line in enumerate(lines):
+    if re.search(r'repo:\s*local', line):
+        local_idx = i
+        break
+
+if local_idx is None:
+    sys.exit(1)
+
+insert_at = len(lines)
+for i in range(local_idx + 1, len(lines)):
+    if re.match(r'\s*- repo:', lines[i]):
+        insert_at = i
+        while insert_at > local_idx and lines[insert_at - 1].strip() == '':
+            insert_at -= 1
+        break
+
+hook = '''
+      - id: terminology-commit-msg
+        name: Terminology Guard (commit message)
+        entry: precommit-scripts/check-commit-msg
+        language: script
+        stages: [commit-msg]
+'''
+lines.insert(insert_at, hook)
+
+with open('$CONFIG', 'w') as f:
+    f.writelines(lines)
+"
+else
+  echo "Adding terminology-commit-msg as new repo: local block..."
+  cat >> "$CONFIG" <<EOF
+
+  - repo: local
+    hooks:
+$COMMIT_MSG_HOOK_ENTRY
+EOF
+fi
+
 # --- blocklist reminder ---
 BLOCKLIST="$HOME/.config/git/blocklist.txt"
 if [ ! -f "$BLOCKLIST" ]; then
@@ -108,6 +162,7 @@ echo ""
 echo "Done. Terminology guard installed for $PROJECT_DIR."
 echo ""
 echo "  Pre-commit gate : precommit-scripts/check-terminology (via .pre-commit-config.yaml)"
+echo "  Commit-msg gate : precommit-scripts/check-commit-msg (via .pre-commit-config.yaml)"
 echo "  History scanner : precommit-scripts/scan-history  (run from any git repo)"
 echo "  Blocklist       : $BLOCKLIST"
 echo "  Excludelist     : $HOME/.config/git/blocklist-exclude.txt  (optional)"

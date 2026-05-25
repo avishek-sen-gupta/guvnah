@@ -18,28 +18,66 @@ fi
 if [ -f "$CONFIG" ]; then
   if grep -q "id: terminology-guard" "$CONFIG" 2>/dev/null; then
     echo "Removing terminology-guard from .pre-commit-config.yaml..."
-    # Remove the terminology-guard hook block (local repo entry)
-    sed -i.bak '/- repo: local/,/types: \[text\]/{
-      /terminology-guard/,/types: \[text\]/d
-      /- repo: local/{
-        N
-        /hooks:/{
-          N
-          /^[[:space:]]*$/d
-        }
-      }
-    }' "$CONFIG"
-    # Clean up empty local repo entries left behind
-    sed -i.bak '/- repo: local/{N;/hooks:$/d;}' "$CONFIG"
-    rm -f "$CONFIG.bak"
+    python3 -c "
+import re, sys
 
-    # If the config is now effectively empty, remove it
-    if ! grep -q "id:" "$CONFIG" 2>/dev/null; then
-      rm -f "$CONFIG"
-      echo ".pre-commit-config.yaml was empty after removal — deleted."
-    fi
+with open('$CONFIG') as f:
+    content = f.read()
+
+# Remove terminology-guard hook block (matches from '- id: terminology-guard' to end of its entry)
+content = re.sub(
+    r'\n[ \t]*- id: terminology-guard\n(?:[ \t]+[^\n]*\n)*',
+    '\n',
+    content
+)
+
+with open('$CONFIG', 'w') as f:
+    f.write(content)
+"
   else
-    echo "Terminology guard not found in .pre-commit-config.yaml, skipping."
+    echo "terminology-guard not found in .pre-commit-config.yaml, skipping."
+  fi
+
+  if grep -q "id: terminology-commit-msg" "$CONFIG" 2>/dev/null; then
+    echo "Removing terminology-commit-msg from .pre-commit-config.yaml..."
+    python3 -c "
+import re, sys
+
+with open('$CONFIG') as f:
+    content = f.read()
+
+# Remove terminology-commit-msg hook block
+content = re.sub(
+    r'\n[ \t]*- id: terminology-commit-msg\n(?:[ \t]+[^\n]*\n)*',
+    '\n',
+    content
+)
+
+with open('$CONFIG', 'w') as f:
+    f.write(content)
+"
+  else
+    echo "terminology-commit-msg not found in .pre-commit-config.yaml, skipping."
+  fi
+
+  # Clean up empty repo: local blocks left behind
+  python3 -c "
+import re
+
+with open('$CONFIG') as f:
+    content = f.read()
+
+# Remove repo: local blocks whose hooks: section is empty
+content = re.sub(r'\n  - repo: local\n    hooks:\n(?:\n)+(?=  - repo:|\Z)', '\n', content)
+
+with open('$CONFIG', 'w') as f:
+    f.write(content)
+" 2>/dev/null || true
+
+  # If the config has no hooks left, remove it
+  if ! grep -q "id:" "$CONFIG" 2>/dev/null; then
+    rm -f "$CONFIG"
+    echo ".pre-commit-config.yaml was empty after removal — deleted."
   fi
 else
   echo "No .pre-commit-config.yaml found, skipping."
@@ -48,7 +86,7 @@ fi
 # --- remove installed scripts ---
 if [ -d "$SCRIPTS_DIR" ]; then
   echo "Removing terminology guard scripts from precommit-scripts/..."
-  rm -f "$SCRIPTS_DIR/check-terminology" "$SCRIPTS_DIR/scan-history" "$SCRIPTS_DIR/lib-terminology.sh"
+  rm -f "$SCRIPTS_DIR/check-terminology" "$SCRIPTS_DIR/check-commit-msg" "$SCRIPTS_DIR/scan-history" "$SCRIPTS_DIR/lib-terminology.sh"
   rmdir "$SCRIPTS_DIR" 2>/dev/null || true
 else
   echo "No precommit-scripts/ directory found, skipping."

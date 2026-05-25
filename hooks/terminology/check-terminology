@@ -33,14 +33,14 @@ scan_staged_changes() {
     # Only look at added lines (starting with +, but not +++ header)
     if [[ "$line" =~ ^\+[^+] ]] || [[ "$line" =~ ^\+$ ]]; then
       local content="${line:1}"  # strip leading +
-      if echo "$content" | grep -qE "$PATTERN"; then
+      if echo "$content" | grep -iqE "$PATTERN"; then
         # First hit: print header
         if [ $found -eq 0 ]; then
           print_table_header "Forbidden terms in staged changes"
           found=1
         fi
 
-        echo "$content" | grep -oE "$PATTERN" | sort -u | while read -r term; do
+        echo "$content" | grep -ioE "$PATTERN" | sort -u | while read -r term; do
           local ctx
           ctx=$(snippet_around "$content" "$term")
           local branch
@@ -54,9 +54,9 @@ scan_staged_changes() {
 
   # Subshell issue: re-check for matches to set exit code
   if [ -n "$EXCLUDE_ARGS" ]; then
-    eval "git diff --cached --diff-filter=ACMR -U0 $EXCLUDE_ARGS" 2>/dev/null | grep -qE "^\+.*($PATTERN)"
+    eval "git diff --cached --diff-filter=ACMR -U0 $EXCLUDE_ARGS" 2>/dev/null | grep -iqE "^\+.*($PATTERN)"
   else
-    git diff --cached --diff-filter=ACMR -U0 2>/dev/null | grep -qE "^\+.*($PATTERN)"
+    git diff --cached --diff-filter=ACMR -U0 2>/dev/null | grep -iqE "^\+.*($PATTERN)"
   fi
   return $?
 }
@@ -65,7 +65,7 @@ scan_staged_changes() {
 
 if scan_staged_changes; then
   # Matches found — print footer and block
-  local_count=$(git diff --cached --diff-filter=ACMR -U0 2>/dev/null | grep -cE "^\+.*($PATTERN)" || echo 0)
+  local_count=$(git diff --cached --diff-filter=ACMR -U0 2>/dev/null | grep -icE "^\+.*($PATTERN)" || echo 0)
   print_table_footer "$local_count"
   print_blocked
   exit 1
