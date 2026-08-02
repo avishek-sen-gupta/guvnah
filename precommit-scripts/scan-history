@@ -10,7 +10,7 @@ source "$SCRIPT_DIR/lib-terminology.sh"
 scan_file_contents() {
   local commits count=0
   echo -e "  ${DIM}Searching commits for pattern matches...${RESET}" >&2
-  commits=$(git log --all -G "$PATTERN" --pretty=format:"%H" -- 2>/dev/null | sort -u)
+  commits=$(git log --all --regexp-ignore-case --perl-regexp -G "$PATTERN" --pretty=format:"%H" -- 2>/dev/null | sort -u)
   [ -z "$commits" ] && { echo -e "  ${DIM}No matches in file contents.${RESET}" >&2; return 1; }
 
   local num_commits
@@ -31,8 +31,8 @@ scan_file_contents() {
     echo -ne "  ${DIM}Scanning commit $i/$num_commits ($short) [${branches}]...\r${RESET}" >&2
 
     echo "$files" | while read -r file; do
-      git show "$sha:$file" 2>/dev/null | grep -nE "$PATTERN" | while IFS=: read -r lineno rest; do
-        echo "$rest" | grep -oE "$PATTERN" | sort -u | while read -r term; do
+      git show "$sha:$file" 2>/dev/null | grep -inE "$PATTERN" | while IFS=: read -r lineno rest; do
+        echo "$rest" | grep -ioE "$PATTERN" | sort -u | while read -r term; do
           local ctx
           ctx=$(snippet_around "$rest" "$term")
           print_table_row "$short" "$branches" "$file:$lineno" "$term" "$ctx"
@@ -47,7 +47,7 @@ scan_file_contents() {
   local total
   total=$(echo "$commits" | while read -r sha; do
     git diff-tree --no-commit-id -r --name-only "$sha" 2>/dev/null | while read -r file; do
-      git show "$sha:$file" 2>/dev/null | grep -cE "$PATTERN" 2>/dev/null
+      git show "$sha:$file" 2>/dev/null | grep -icE "$PATTERN" 2>/dev/null
     done
   done | awk '{s+=$1} END {print s+0}')
   print_table_footer "$total"
@@ -60,7 +60,7 @@ scan_commit_messages() {
   echo -e "  ${DIM}Searching commit messages for pattern matches...${RESET}" >&2
   hits=$(git log --all --format='%x00%H %h %s %b' 2>/dev/null \
     | tr '\n' ' ' | tr '\0' '\n' \
-    | grep -E "$PATTERN" | head -10)
+    | grep -iE "$PATTERN" | head -10)
   [ -z "$hits" ] && { echo -e "  ${DIM}No matches in commit messages.${RESET}" >&2; return 1; }
 
   local num_hits
@@ -81,9 +81,9 @@ scan_commit_messages() {
     [ -z "$branches" ] && branches="-"
     echo -ne "  ${DIM}Scanning message $i/$num_hits ($sha) [${branches}]...\r${RESET}" >&2
 
-    echo "$msg" | grep -oE "$PATTERN" | sort -u | while read -r term; do
+    echo "$msg" | grep -ioE "$PATTERN" | sort -u | while read -r term; do
       local pos ctx
-      pos=$(echo "$msg" | grep -boE "$term" | head -1 | cut -d: -f1)
+      pos=$(echo "$msg" | grep -iboE "$term" | head -1 | cut -d: -f1)
       ctx=$(snippet_around "$msg" "$term")
       print_table_row "$sha" "$branches" "col:$pos" "$term" "$ctx"
       count=$((count + 1))
