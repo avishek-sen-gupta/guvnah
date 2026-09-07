@@ -15,7 +15,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["governor_v4"]
+packages = []
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

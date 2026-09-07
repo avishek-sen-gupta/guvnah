@@ -2,7 +2,7 @@
 
 ## Project Context
 
-- **Language:** Python 3.10+ (governor), Shell (hooks/installers), Markdown (commands/docs)
+- **Language:** Shell (hooks/installers), Python 3.10+ (hook helpers/tests), Markdown (commands/docs)
 - **Test framework:** pytest
 - **Pre-commit hooks:** Talisman (secret detection)
 - **Issue tracker:** Beads (`bd`)
@@ -10,12 +10,14 @@
 
 ## Architecture
 
-Two independent modes sharing a plugin directory (`~/.claude/plugins/context-injector/`):
+A set of independent Claude Code hooks, each with its own installer:
 
-- **v1 (keyword classification):** `UserPromptSubmit` hook injects context files based on prompt keywords. Toggled via `/ctx on|off`. Lock file: `/tmp/ctx-locks/<hash>`.
-- **v2 (state machine governor):** `SessionStart`, `PreToolUse`, `PostToolUse`, `PreCompact` hooks enforce workflow phases and inject context per state. Toggled via `/governor <machine>|off|status`. Lock file: `/tmp/ctx-governor/<hash>`.
+- **Context injection (`hooks/user-prompt-submit.sh`):** `UserPromptSubmit` hook injects context files from `.claude/core/` and `.claude/conditional/` based on prompt keywords. Toggled via `/ctx on|off`. Lock file: `/tmp/ctx-locks/<hash>`. Installed to `~/.claude/plugins/context-injector/`.
+- **Pipefail guard (`hooks/pipefail-guard.sh`):** `PreToolUse` hook (matcher `Bash`) that prepends `set -o pipefail;` to every Bash command. Installed into the target project's `.claude/hooks/`.
+- **Beads terminology guard (`hooks/bd-terminology-guard.sh`):** `PreToolUse` hook that blocks `bd` commands containing terms from `~/.config/git/blocklist.txt`.
+- **Git terminology guard (`hooks/terminology/`, `precommit-scripts/`):** a git pre-commit/commit-msg hook plus `scan-history`, sharing the same blocklist.
 
-Both modes use separate lock files and can be enabled independently.
+Each tool uses separate lock files and hook wiring, and can be enabled independently.
 
 ## Task Tracking
 
@@ -50,7 +52,7 @@ When asked to audit or show issues, only report findings — do not fix unless e
 Classify before starting. This determines how much ceremony is needed.
 
 - **Light** (< 50 lines, single file, no new abstractions) — brief brainstorm. Example: adding a keyword to the classifier.
-- **Standard** (50–300 lines, 2–5 files, follows existing patterns) — brainstorm identifies the pattern being followed. Example: adding a new state machine.
+- **Standard** (50–300 lines, 2–5 files, follows existing patterns) — brainstorm identifies the pattern being followed. Example: adding a new hook with its installer, uninstaller and tests.
 - **Heavy** (300+ lines, new abstractions, multiple subsystems) — brainstorm must produce a written design with trade-offs before any code. Break into independently-committable units. Do not attempt in a single pass. Re-read actual code before each phase — design documents can anchor you to a flawed model.
 
 ### Verification gate

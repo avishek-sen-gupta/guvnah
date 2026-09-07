@@ -3,7 +3,7 @@ repos:
     rev: 24.4.2
     hooks:
       - id: black
-        args: [governor_v4, tests]
+        args: [tests]
 
   - repo: local
     hooks:
