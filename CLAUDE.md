@@ -1,4 +1,4 @@
-# Context Injector — Agent Instructions
+# guvnah — Agent Instructions
 
 ## Project Context
 
@@ -10,14 +10,13 @@
 
 ## Architecture
 
-A set of independent Claude Code hooks, each with its own installer:
+A set of independent guard hooks for Claude Code, each with its own installer:
 
-- **Context injection (`hooks/user-prompt-submit.sh`):** `UserPromptSubmit` hook injects context files from `.claude/core/` and `.claude/conditional/` based on prompt keywords. Toggled via `/ctx on|off`. Lock file: `/tmp/ctx-locks/<hash>`. Installed to `~/.claude/plugins/context-injector/`.
 - **Pipefail guard (`hooks/pipefail-guard.sh`):** `PreToolUse` hook (matcher `Bash`) that prepends `set -o pipefail;` to every Bash command. Installed into the target project's `.claude/hooks/`.
 - **Beads terminology guard (`hooks/bd-terminology-guard.sh`):** `PreToolUse` hook that blocks `bd` commands containing terms from `~/.config/git/blocklist.txt`.
 - **Git terminology guard (`hooks/terminology/`, `precommit-scripts/`):** a git pre-commit/commit-msg hook plus `scan-history`, sharing the same blocklist.
 
-Each tool uses separate lock files and hook wiring, and can be enabled independently.
+Each tool wires its own hook and can be enabled independently.
 
 ## Task Tracking
 
@@ -42,7 +41,7 @@ Every non-trivial task goes through these phases. Do not skip. Do not start impl
 4. **Implement** — Write the minimum code to make the tests pass.
 5. **Self-review** — Before running the verification gate, review your own diff (`git diff`). Look for: workaround guards, missing test coverage, weak assertions, stale docs. If the diff is large (Heavy task), run the `/review` skill.
 6. **Verify** — Run `python3 -m pytest tests/`. All tests must pass.
-7. **Deploy** — Copy changed files to `~/.claude/plugins/context-injector/` and `~/.claude/commands/` as appropriate.
+7. **Deploy** — Re-run the relevant `install-*.sh` so the deployed copy (the target project's `.claude/hooks/` or `precommit-scripts/`, or `~/.claude/plugins/guvnah/`) matches the repo.
 8. **Commit** — One logical unit per commit. `bd backup` before `git add`. Push to remote only when asked.
 
 When asked to audit or show issues, only report findings — do not fix unless explicitly asked.

@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "context-injector"
+name = "guvnah"
 version = "2.0.0"
 requires-python = ">=3.10"
 dependencies = []

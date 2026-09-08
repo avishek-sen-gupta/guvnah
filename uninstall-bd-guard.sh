@@ -26,9 +26,18 @@ else
 fi
 
 # --- remove hook file ---
-if [ -f ~/.claude/plugins/context-injector/hooks/bd-terminology-guard.sh ]; then
-  rm -f ~/.claude/plugins/context-injector/hooks/bd-terminology-guard.sh
+if [ -f ~/.claude/plugins/guvnah/hooks/bd-terminology-guard.sh ]; then
+  rm -f ~/.claude/plugins/guvnah/hooks/bd-terminology-guard.sh
   echo "Removed bd-terminology-guard.sh"
+fi
+
+# --- clean up legacy install location if present ---
+LEGACY_HOOK="$HOME/.claude/plugins/context-injector/hooks/bd-terminology-guard.sh"
+if [ -f "$LEGACY_HOOK" ]; then
+  echo "Removing legacy install at $LEGACY_HOOK..."
+  rm -f "$LEGACY_HOOK"
+  rmdir "$HOME/.claude/plugins/context-injector/hooks" 2>/dev/null || true
+  rmdir "$HOME/.claude/plugins/context-injector" 2>/dev/null || true
 fi
 
 echo ""

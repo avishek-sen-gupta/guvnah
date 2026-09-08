@@ -22,9 +22,9 @@ fi
 
 # --- install hook ---
 echo "Installing bd-terminology-guard hook..."
-mkdir -p ~/.claude/plugins/context-injector/hooks
-cp "$PLUGIN_DIR/hooks/bd-terminology-guard.sh" ~/.claude/plugins/context-injector/hooks/
-chmod +x ~/.claude/plugins/context-injector/hooks/bd-terminology-guard.sh
+mkdir -p ~/.claude/plugins/guvnah/hooks
+cp "$PLUGIN_DIR/hooks/bd-terminology-guard.sh" ~/.claude/plugins/guvnah/hooks/
+chmod +x ~/.claude/plugins/guvnah/hooks/bd-terminology-guard.sh
 
 # --- create settings.json if missing ---
 if [ ! -f "$SETTINGS" ]; then
@@ -35,7 +35,7 @@ fi
 HAS_BD_GUARD=$(jq '[.hooks.PreToolUse[]?.hooks[]?.command // ""] | any(contains("bd-terminology-guard"))' "$SETTINGS")
 if [ "$HAS_BD_GUARD" = "false" ]; then
   echo "Wiring bd-terminology-guard PreToolUse hook..."
-  HOOK_ENTRY='{"hooks": [{"type": "command", "command": "~/.claude/plugins/context-injector/hooks/bd-terminology-guard.sh"}]}'
+  HOOK_ENTRY='{"hooks": [{"type": "command", "command": "~/.claude/plugins/guvnah/hooks/bd-terminology-guard.sh"}]}'
   jq --argjson entry "$HOOK_ENTRY" \
     '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [$entry])' \
     "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
