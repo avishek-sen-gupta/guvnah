@@ -17,7 +17,7 @@ A set of independent guard hooks for Claude Code, each with its own installer:
 - **Beads terminology guard (`hooks/bd-terminology-guard.sh`):** `PreToolUse` hook that blocks `bd` write commands matching the rules, via `betterleaks stdin`.
 - **Git terminology guard (`hooks/terminology/`, deployed to `precommit-scripts/`):** pre-commit (`betterleaks git --pre-commit --staged`) and commit-msg (`betterleaks stdin`) hooks plus `scan-history`.
 
-Each tool wires its own hook and can be enabled independently.
+Each tool wires its own hook and can be enabled independently. `install-guards.sh` / `uninstall-guards.sh` run both terminology guard installers together.
 
 ## Task Tracking
 

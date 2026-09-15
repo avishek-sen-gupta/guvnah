@@ -55,6 +55,17 @@ The development environment (`.venv/` managed by uv) is independent of the hook 
 
 ## Installation
 
+### Terminology guards in one step
+
+```bash
+cd /path/to/your/project
+/path/to/guvnah/install-guards.sh
+```
+
+Runs `install-terminology-guard.sh` (which also runs `pre-commit install` for the pre-commit and commit-msg hooks) and `install-bd-guard.sh` (skipped when the project has no `.claude/` directory), then prints whether the rules file and `betterleaks` are in place.
+
+Uninstall both: `/path/to/guvnah/uninstall-guards.sh` (leaves pre-commit itself installed).
+
 ### Pipefail Guard
 
 ```bash
@@ -88,10 +99,9 @@ With no `terminology.toml` the guards allow everything; with the rules present b
 ```bash
 cd /path/to/your/project
 /path/to/guvnah/install-terminology-guard.sh
-pre-commit install --hook-type pre-commit --hook-type commit-msg
 ```
 
-Installs `check-terminology`, `check-commit-msg`, `scan-history`, `blocklist-to-toml` and `lib-terminology.sh` → `precommit-scripts/`, and wires `terminology-guard` (pre-commit) and `terminology-commit-msg` (commit-msg) into `.pre-commit-config.yaml` (idempotent).
+Installs `check-terminology`, `check-commit-msg`, `scan-history`, `blocklist-to-toml` and `lib-terminology.sh` → `precommit-scripts/`, wires `terminology-guard` (pre-commit) and `terminology-commit-msg` (commit-msg) into `.pre-commit-config.yaml`, and runs `pre-commit install --hook-type pre-commit --hook-type commit-msg` (warning instead if pre-commit is unavailable). Re-running replaces existing entries, so it also upgrades older installs.
 
 - Staged content: `betterleaks git --pre-commit --staged`
 - Commit message: `betterleaks stdin < <message file>`

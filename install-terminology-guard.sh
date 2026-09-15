@@ -80,6 +80,16 @@ wire_hook terminology-commit-msg "      - id: terminology-commit-msg
         stages: [commit-msg]
 "
 
+# --- activate the hooks in .git/hooks ---
+if command -v pre-commit > /dev/null 2>&1 \
+  && pre-commit install --hook-type pre-commit --hook-type commit-msg; then
+  echo "Activated pre-commit and commit-msg hooks."
+else
+  echo ""
+  echo "Warning: could not activate the hooks. Install pre-commit, then run in $PROJECT_DIR:"
+  echo "  pre-commit install --hook-type pre-commit --hook-type commit-msg"
+fi
+
 # --- prerequisites reminder ---
 if ! command -v betterleaks > /dev/null 2>&1; then
   echo ""
@@ -96,6 +106,6 @@ echo ""
 echo "Done. Betterleaks terminology guard installed for $PROJECT_DIR."
 echo ""
 echo "  Pre-commit gate : precommit-scripts/check-terminology (via .pre-commit-config.yaml)"
-echo "  Commit-msg gate : precommit-scripts/check-commit-msg (needs: pre-commit install --hook-type commit-msg)"
+echo "  Commit-msg gate : precommit-scripts/check-commit-msg (via .pre-commit-config.yaml)"
 echo "  History scanner : precommit-scripts/scan-history"
 echo "  Rules           : $RULES"
