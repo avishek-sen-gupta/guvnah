@@ -1,14 +1,12 @@
 """Tests for the betterleaks-backed terminology guard.
 
-The betterleaks guard runs alongside the grep-based terminology guard until
-parity is verified. Tests cover:
+Tests cover:
 - blocklist-to-toml: converting blocklist.txt + blocklist-exclude.txt to a rules file
 - check-terminology-bl: staged content scanning
 - check-commit-msg-bl: commit message scanning
 - scan-history-bl: history content + commit message scanning
 - bd-guard-bl.sh: Beads PreToolUse hook
-- installers/uninstallers, including coexistence with the grep-based guard
-- parity: grep-based and betterleaks hooks agree on the same inputs
+- installers/uninstallers
 """
 
 import json
@@ -30,20 +28,10 @@ CHECK_TERMINOLOGY_BL = os.path.join(BL_DIR, "check-terminology-bl")
 CHECK_COMMIT_MSG_BL = os.path.join(BL_DIR, "check-commit-msg-bl")
 SCAN_HISTORY_BL = os.path.join(BL_DIR, "scan-history-bl")
 BD_GUARD_BL = os.path.join(REPO_ROOT, "hooks", "bd-guard-bl.sh")
-OLD_INSTALL_BD = os.path.join(REPO_ROOT, "install-bd-guard.sh")
-OLD_UNINSTALL_BD = os.path.join(REPO_ROOT, "uninstall-bd-guard.sh")
 INSTALL_BL = os.path.join(REPO_ROOT, "install-betterleaks-guard.sh")
 UNINSTALL_BL = os.path.join(REPO_ROOT, "uninstall-betterleaks-guard.sh")
 INSTALL_BD_BL = os.path.join(REPO_ROOT, "install-bd-guard-bl.sh")
 UNINSTALL_BD_BL = os.path.join(REPO_ROOT, "uninstall-bd-guard-bl.sh")
-OLD_CHECK_TERMINOLOGY = os.path.join(
-    REPO_ROOT, "hooks", "terminology", "check-terminology"
-)
-OLD_CHECK_COMMIT_MSG = os.path.join(
-    REPO_ROOT, "hooks", "terminology", "check-commit-msg"
-)
-OLD_INSTALL = os.path.join(REPO_ROOT, "install-terminology-guard.sh")
-OLD_UNINSTALL = os.path.join(REPO_ROOT, "uninstall-terminology-guard.sh")
 
 
 # ── helpers ──────────────────────────────────────────────────────
@@ -424,29 +412,6 @@ class TestInstallBetterleaksGuard:
         block = config.split("id: bl-terminology-commit-msg")[1].split("- id:")[0]
         assert "stages: [commit-msg]" in block
 
-    def test_coexists_with_grep_based_guard(self, tmp_path):
-        repo = init_git_repo(str(tmp_path / "repo"))
-        home = str(tmp_path / "home")
-        assert run_installer(OLD_INSTALL, repo, home).returncode == 0
-        assert run_installer(INSTALL_BL, repo, home).returncode == 0
-        config = read_config(repo)
-        for hook_id in [
-            "terminology-guard",
-            "terminology-commit-msg",
-            "bl-terminology-guard",
-            "bl-terminology-commit-msg",
-        ]:
-            assert config.count(f"id: {hook_id}\n") == 1, hook_id
-
-    def test_old_installer_after_new_still_wires_old_hooks(self, tmp_path):
-        repo = init_git_repo(str(tmp_path / "repo"))
-        home = str(tmp_path / "home")
-        assert run_installer(INSTALL_BL, repo, home).returncode == 0
-        assert run_installer(OLD_INSTALL, repo, home).returncode == 0
-        config = read_config(repo)
-        assert config.count("id: terminology-guard\n") == 1
-        assert config.count("id: terminology-commit-msg\n") == 1
-
     def test_warns_when_rules_file_missing(self, tmp_path):
         repo = init_git_repo(str(tmp_path / "repo"))
         result = run_installer(INSTALL_BL, repo, str(tmp_path / "home"))
@@ -466,32 +431,6 @@ class TestUninstallBetterleaksGuard:
         assert result.returncode == 0, result.stderr
         assert not os.path.exists(os.path.join(repo, "precommit-scripts"))
         assert "bl-terminology" not in read_config(repo)
-
-    def test_leaves_grep_based_guard_intact(self, tmp_path):
-        repo = init_git_repo(str(tmp_path / "repo"))
-        home = str(tmp_path / "home")
-        run_installer(OLD_INSTALL, repo, home)
-        run_installer(INSTALL_BL, repo, home)
-        run_installer(UNINSTALL_BL, repo, home)
-        config = read_config(repo)
-        assert "id: terminology-guard\n" in config
-        assert "id: terminology-commit-msg\n" in config
-        assert os.path.isfile(
-            os.path.join(repo, "precommit-scripts", "check-terminology")
-        )
-
-    def test_grep_based_uninstall_leaves_betterleaks_guard_intact(self, tmp_path):
-        repo = init_git_repo(str(tmp_path / "repo"))
-        home = str(tmp_path / "home")
-        run_installer(OLD_INSTALL, repo, home)
-        run_installer(INSTALL_BL, repo, home)
-        run_installer(OLD_UNINSTALL, repo, home)
-        config = read_config(repo)
-        assert "id: bl-terminology-guard\n" in config
-        assert "id: bl-terminology-commit-msg\n" in config
-        assert os.path.isfile(
-            os.path.join(repo, "precommit-scripts", "check-terminology-bl")
-        )
 
     def test_preserves_unrelated_hooks(self, tmp_path):
         repo = init_git_repo(str(tmp_path / "repo"))
@@ -542,78 +481,23 @@ class TestInstallBdGuardBl:
         commands = settings_commands(project)
         assert sum("bd-guard-bl" in c for c in commands) == 1
 
-    def test_uninstall_removes_only_betterleaks_variant(self, tmp_path):
+    def test_uninstall_removes_hook_and_keeps_unrelated_hooks(self, tmp_path):
         project = claude_project(tmp_path)
         home = str(tmp_path / "home")
-        assert run_installer(OLD_INSTALL_BD, project, home).returncode == 0
+        with open(os.path.join(project, ".claude", "settings.json"), "w") as f:
+            json.dump(
+                {
+                    "hooks": {
+                        "PreToolUse": [
+                            {"hooks": [{"type": "command", "command": "other.sh"}]}
+                        ]
+                    }
+                },
+                f,
+            )
         run_installer(INSTALL_BD_BL, project, home)
         result = run_installer(UNINSTALL_BD_BL, project, home)
         assert result.returncode == 0, result.stderr
-        commands = settings_commands(project)
-        assert not any("bd-guard-bl" in c for c in commands)
-        assert any(c.endswith("bd-terminology-guard.sh") for c in commands)
+        assert settings_commands(project) == ["other.sh"]
         hook_dir = os.path.join(home, ".claude", "plugins", "guvnah", "hooks")
         assert not os.path.exists(os.path.join(hook_dir, "bd-guard-bl.sh"))
-        assert os.path.exists(os.path.join(hook_dir, "bd-terminology-guard.sh"))
-
-    def test_grep_based_installer_after_betterleaks_still_wires(self, tmp_path):
-        project = claude_project(tmp_path)
-        home = str(tmp_path / "home")
-        run_installer(INSTALL_BD_BL, project, home)
-        assert run_installer(OLD_INSTALL_BD, project, home).returncode == 0
-        commands = settings_commands(project)
-        assert sum(c.endswith("bd-terminology-guard.sh") for c in commands) == 1
-        assert sum("bd-guard-bl" in c for c in commands) == 1
-
-    def test_grep_based_uninstall_leaves_betterleaks_variant(self, tmp_path):
-        project = claude_project(tmp_path)
-        home = str(tmp_path / "home")
-        run_installer(OLD_INSTALL_BD, project, home)
-        run_installer(INSTALL_BD_BL, project, home)
-        assert run_installer(OLD_UNINSTALL_BD, project, home).returncode == 0
-        commands = settings_commands(project)
-        assert sum("bd-guard-bl" in c for c in commands) == 1
-
-
-# ── parity with the grep-based guard ─────────────────────────────
-
-PARITY_PATTERNS = ["zorblax", "quibbit", "frobnitz co", "quux[0-9]+"]
-PARITY_TEXTS = [
-    "connect to zorblax\n",
-    "the QUIBBIT replica\n",
-    "Frobnitz Co deal\n",
-    "see quux42 here\n",
-    "quux alone\n",
-    "zorblaxful work\n",
-    "all clean here\n",
-    "line one\nline two mentions Zorblax\n",
-]
-
-
-class TestParityWithGrepGuard:
-    @pytest.mark.parametrize("text", PARITY_TEXTS)
-    def test_staged_content_verdicts_match(self, tmp_path, text):
-        repo = init_git_repo(str(tmp_path / "repo"))
-        home = setup_rules(tmp_path, PARITY_PATTERNS)
-        stage_content(repo, text)
-        old = run_script(OLD_CHECK_TERMINOLOGY, [], home, repo)
-        new = run_script(CHECK_TERMINOLOGY_BL, [], home, repo)
-        assert (old.returncode, new.returncode) in [(0, 0), (1, 1)]
-
-    @pytest.mark.parametrize("text", PARITY_TEXTS)
-    def test_commit_message_verdicts_match(self, tmp_path, text):
-        repo = init_git_repo(str(tmp_path / "repo"))
-        home = setup_rules(tmp_path, PARITY_PATTERNS)
-        msg_file = tmp_path / "COMMIT_EDITMSG"
-        msg_file.write_text(text)
-        old = run_script(OLD_CHECK_COMMIT_MSG, [str(msg_file)], home, repo)
-        new = run_script(CHECK_COMMIT_MSG_BL, [str(msg_file)], home, repo)
-        assert (old.returncode, new.returncode) in [(0, 0), (1, 1)]
-
-    def test_excluded_path_verdicts_match(self, tmp_path):
-        repo = init_git_repo(str(tmp_path / "repo"))
-        home = setup_rules(tmp_path, PARITY_PATTERNS, excludes=["docs"])
-        stage_content(repo, "zorblax\n", filename="docs/guide.txt")
-        old = run_script(OLD_CHECK_TERMINOLOGY, [], home, repo)
-        new = run_script(CHECK_TERMINOLOGY_BL, [], home, repo)
-        assert (old.returncode, new.returncode) == (0, 0)

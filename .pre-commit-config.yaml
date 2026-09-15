@@ -14,14 +14,15 @@ repos:
         pass_filenames: false
         always_run: true
 
-      - id: terminology-guard
-        name: Terminology Guard
-        entry: precommit-scripts/check-terminology
+      - id: bl-terminology-guard
+        name: Terminology Guard (betterleaks)
+        entry: precommit-scripts/check-terminology-bl
         language: script
-        types: [text]
+        pass_filenames: false
+        always_run: true
 
-      - id: terminology-commit-msg
-        name: Terminology Guard (commit message)
-        entry: precommit-scripts/check-commit-msg
+      - id: bl-terminology-commit-msg
+        name: Terminology Guard (betterleaks, commit message)
+        entry: precommit-scripts/check-commit-msg-bl
         language: script
         stages: [commit-msg]
