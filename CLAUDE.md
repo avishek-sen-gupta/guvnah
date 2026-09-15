@@ -13,9 +13,9 @@
 A set of independent guard hooks for Claude Code, each with its own installer:
 
 - **Pipefail guard (`hooks/pipefail-guard.sh`):** `PreToolUse` hook (matcher `Bash`) that prepends `set -o pipefail;` to every Bash command. Installed into the target project's `.claude/hooks/`.
-- **Terminology rules (`hooks/betterleaks/blocklist-to-toml`):** converts `~/.config/git/blocklist.txt` (+ `blocklist-exclude.txt`) into `~/.config/git/terminology.toml`, the betterleaks rules file both terminology guards read.
-- **Beads terminology guard (`hooks/bd-guard-bl.sh`):** `PreToolUse` hook that blocks `bd` write commands matching the rules, via `betterleaks stdin`.
-- **Git terminology guard (`hooks/betterleaks/`, deployed to `precommit-scripts/`):** pre-commit (`betterleaks git --pre-commit --staged`) and commit-msg (`betterleaks stdin`) hooks plus `scan-history-bl`.
+- **Terminology rules (`hooks/terminology/blocklist-to-toml`):** converts `~/.config/git/blocklist.txt` (+ `blocklist-exclude.txt`) into `~/.config/git/terminology.toml`, the betterleaks rules file both terminology guards read.
+- **Beads terminology guard (`hooks/bd-terminology-guard.sh`):** `PreToolUse` hook that blocks `bd` write commands matching the rules, via `betterleaks stdin`.
+- **Git terminology guard (`hooks/terminology/`, deployed to `precommit-scripts/`):** pre-commit (`betterleaks git --pre-commit --staged`) and commit-msg (`betterleaks stdin`) hooks plus `scan-history`.
 
 Each tool wires its own hook and can be enabled independently.
 

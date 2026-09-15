@@ -1,7 +1,6 @@
 #!/bin/sh
-# uninstall-betterleaks-guard.sh — betterleaks-backed Terminology Guard uninstaller.
+# uninstall-terminology-guard.sh — betterleaks-backed Terminology Guard uninstaller.
 # Run from the root of the git project you want to unwire.
-# Leaves the grep-based terminology guard untouched.
 
 set -e
 
@@ -25,7 +24,7 @@ config = os.environ["CONFIG"]
 content = open(config).read()
 
 # Remove each hook entry: its '- id:' line plus the lines indented deeper than the dash.
-for hook_id in ["bl-terminology-guard", "bl-terminology-commit-msg"]:
+for hook_id in ["terminology-guard", "terminology-commit-msg"]:
     content = re.sub(
         r"\n?([ \t]*)- id: " + re.escape(hook_id) + r"[ \t]*\n(?:\1[ \t]+[^\n]*\n)*",
         "\n",
@@ -49,8 +48,8 @@ fi
 # --- remove installed scripts ---
 if [ -d "$SCRIPTS_DIR" ]; then
   echo "Removing betterleaks terminology guard scripts from precommit-scripts/..."
-  rm -f "$SCRIPTS_DIR/lib-betterleaks.sh" "$SCRIPTS_DIR/check-terminology-bl" \
-    "$SCRIPTS_DIR/check-commit-msg-bl" "$SCRIPTS_DIR/scan-history-bl" "$SCRIPTS_DIR/blocklist-to-toml"
+  rm -f "$SCRIPTS_DIR/lib-terminology.sh" "$SCRIPTS_DIR/check-terminology" \
+    "$SCRIPTS_DIR/check-commit-msg" "$SCRIPTS_DIR/scan-history" "$SCRIPTS_DIR/blocklist-to-toml"
   rmdir "$SCRIPTS_DIR" 2>/dev/null || true
 fi
 

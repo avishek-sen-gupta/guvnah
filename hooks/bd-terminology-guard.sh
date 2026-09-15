@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
-# bd-guard-bl.sh — PreToolUse hook that blocks Beads issue write commands
+# bd-terminology-guard.sh — PreToolUse hook that blocks Beads issue write commands
 # containing forbidden terminology, matched by betterleaks against
 # ~/.config/git/terminology.toml.
-#
-# betterleaks-backed counterpart of bd-terminology-guard.sh. Named without the
-# "bd-terminology-guard" substring so the grep-based installers don't mistake it
-# for their own hook.
 #
 # Receives Claude Code hook JSON on stdin:
 #   {"tool_name": "Bash", "tool_input": {"command": "bd create ..."}}

@@ -1,6 +1,6 @@
 #!/bin/sh
-# uninstall-bd-guard-bl.sh — betterleaks-backed Beads terminology guard uninstaller.
-# Run from the root of the project you want to unwire. Leaves bd-terminology-guard.sh alone.
+# uninstall-bd-guard.sh — betterleaks-backed Beads terminology guard uninstaller.
+# Run from the root of the project you want to unwire.
 # Requires: jq
 
 set -e
@@ -16,8 +16,8 @@ fi
 
 # --- remove hook from settings.json ---
 if [ -f "$SETTINGS" ]; then
-  echo "Removing bd-guard-bl hook from settings.json..."
-  jq '.hooks.PreToolUse = [(.hooks.PreToolUse // [])[] | select(any(.hooks[]?; .command | contains("bd-guard-bl")) | not)]
+  echo "Removing bd-terminology-guard hook from settings.json..."
+  jq '.hooks.PreToolUse = [(.hooks.PreToolUse // [])[] | select(any(.hooks[]?; .command | contains("bd-terminology-guard")) | not)]
      | if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end
      | if (.hooks | length) == 0 then del(.hooks) else . end' \
     "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
@@ -26,9 +26,9 @@ else
 fi
 
 # --- remove hook file ---
-if [ -f ~/.claude/plugins/guvnah/hooks/bd-guard-bl.sh ]; then
-  rm -f ~/.claude/plugins/guvnah/hooks/bd-guard-bl.sh
-  echo "Removed bd-guard-bl.sh"
+if [ -f ~/.claude/plugins/guvnah/hooks/bd-terminology-guard.sh ]; then
+  rm -f ~/.claude/plugins/guvnah/hooks/bd-terminology-guard.sh
+  echo "Removed bd-terminology-guard.sh"
 fi
 
 echo ""

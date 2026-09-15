@@ -11,7 +11,7 @@ A collection of Claude Code hooks and tools for enforcing discipline during agen
 - **[Python FP Lint](https://github.com/avishek-sen-gupta/python-fp-lint)** (`/lint`) — a functional-programming linter for Python that detects mutation, reassignment, and impurity patterns using ast-grep, Ruff, and beniget backends
 - **Beads Terminology Guard** — a PreToolUse hook that blocks Beads issue-tracker commands containing sensitive terminology
 - **Git Terminology Guard** — git pre-commit and commit-msg hooks that prevent forbidden terms from entering source history
-- **History Scanner** (`scan-history-bl`) — scans full git history (file contents + commit messages) for forbidden terms
+- **History Scanner** (`scan-history`) — scans full git history (file contents + commit messages) for forbidden terms
 
 The terminology guards use [betterleaks](https://github.com/betterleaks/betterleaks) for matching, driven by a rules file generated from your blocklist.
 
@@ -24,8 +24,8 @@ Every tool wires its own hook and can be enabled independently:
 | Tool | Command | Hook events |
 |---|---|---|
 | Pipefail Guard | `install-pipefail-guard.sh` / `uninstall-pipefail-guard.sh` | `PreToolUse` (matcher: Bash) |
-| Beads Terminology Guard | `install-bd-guard-bl.sh` / `uninstall-bd-guard-bl.sh` | `PreToolUse` |
-| Git Terminology Guard | `install-betterleaks-guard.sh` / `uninstall-betterleaks-guard.sh` | git pre-commit + commit-msg hooks |
+| Beads Terminology Guard | `install-bd-guard.sh` / `uninstall-bd-guard.sh` | `PreToolUse` |
+| Git Terminology Guard | `install-terminology-guard.sh` / `uninstall-terminology-guard.sh` | git pre-commit + commit-msg hooks |
 
 When several are active they don't conflict — each operates on its own hook wiring.
 
@@ -76,7 +76,7 @@ Both terminology guards read `~/.config/git/terminology.toml`, generated from yo
 - **Excludelist:** `~/.config/git/blocklist-exclude.txt` — git pathspec globs for files to skip (optional)
 
 ```bash
-/path/to/guvnah/hooks/betterleaks/blocklist-to-toml > ~/.config/git/terminology.toml
+/path/to/guvnah/hooks/terminology/blocklist-to-toml > ~/.config/git/terminology.toml
 ```
 
 The generated file holds one rule matching every term, plus a path prefilter for the exclude globs. Regenerate it after editing either list.
@@ -87,28 +87,28 @@ With no `terminology.toml` the guards allow everything; with the rules present b
 
 ```bash
 cd /path/to/your/project
-/path/to/guvnah/install-betterleaks-guard.sh
+/path/to/guvnah/install-terminology-guard.sh
 pre-commit install --hook-type pre-commit --hook-type commit-msg
 ```
 
-Installs `check-terminology-bl`, `check-commit-msg-bl`, `scan-history-bl`, `blocklist-to-toml` and `lib-betterleaks.sh` → `precommit-scripts/`, and wires `bl-terminology-guard` (pre-commit) and `bl-terminology-commit-msg` (commit-msg) into `.pre-commit-config.yaml` (idempotent).
+Installs `check-terminology`, `check-commit-msg`, `scan-history`, `blocklist-to-toml` and `lib-terminology.sh` → `precommit-scripts/`, and wires `terminology-guard` (pre-commit) and `terminology-commit-msg` (commit-msg) into `.pre-commit-config.yaml` (idempotent).
 
 - Staged content: `betterleaks git --pre-commit --staged`
 - Commit message: `betterleaks stdin < <message file>`
-- History: `precommit-scripts/scan-history-bl` runs `betterleaks git` over all commits, then pipes every commit message line (prefixed with its short SHA) through `betterleaks stdin`
+- History: `precommit-scripts/scan-history` runs `betterleaks git` over all commits, then pipes every commit message line (prefixed with its short SHA) through `betterleaks stdin`
 
-Uninstall: `/path/to/guvnah/uninstall-betterleaks-guard.sh`
+Uninstall: `/path/to/guvnah/uninstall-terminology-guard.sh`
 
 ### Beads Terminology Guard
 
 ```bash
 cd /path/to/your/project
-/path/to/guvnah/install-bd-guard-bl.sh
+/path/to/guvnah/install-bd-guard.sh
 ```
 
-Installs `bd-guard-bl.sh` → `~/.claude/plugins/guvnah/hooks/` and wires a `PreToolUse` hook in `.claude/settings.json`. It blocks `bd` write commands (`create`, `update`, `comment`, …) whose text matches the rules.
+Installs `bd-terminology-guard.sh` → `~/.claude/plugins/guvnah/hooks/` and wires a `PreToolUse` hook in `.claude/settings.json`. It blocks `bd` write commands (`create`, `update`, `comment`, …) whose text matches the rules.
 
-Uninstall: `/path/to/guvnah/uninstall-bd-guard-bl.sh`
+Uninstall: `/path/to/guvnah/uninstall-bd-guard.sh`
 
 ### All tools
 
@@ -123,15 +123,15 @@ All scripts are idempotent — safe to run multiple times.
 **1. Copy the hook:**
 ```bash
 mkdir -p ~/.claude/plugins/guvnah/hooks
-cp hooks/bd-guard-bl.sh ~/.claude/plugins/guvnah/hooks/
-chmod +x ~/.claude/plugins/guvnah/hooks/bd-guard-bl.sh
+cp hooks/bd-terminology-guard.sh ~/.claude/plugins/guvnah/hooks/
+chmod +x ~/.claude/plugins/guvnah/hooks/bd-terminology-guard.sh
 ```
 
 **2. Wire in `.claude/settings.json`:**
 ```json
 "hooks": {
   "PreToolUse": [
-    {"hooks": [{"type": "command", "command": "~/.claude/plugins/guvnah/hooks/bd-guard-bl.sh"}]}
+    {"hooks": [{"type": "command", "command": "~/.claude/plugins/guvnah/hooks/bd-terminology-guard.sh"}]}
   ]
 }
 ```
@@ -140,7 +140,7 @@ chmod +x ~/.claude/plugins/guvnah/hooks/bd-guard-bl.sh
 ```bash
 mkdir -p ~/.config/git
 echo "sensitive-term" >> ~/.config/git/blocklist.txt
-hooks/betterleaks/blocklist-to-toml > ~/.config/git/terminology.toml
+hooks/terminology/blocklist-to-toml > ~/.config/git/terminology.toml
 ```
 
 ## License

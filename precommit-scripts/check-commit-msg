@@ -5,13 +5,13 @@
 # Exit 0 = clean, Exit 1 = blocked.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/lib-betterleaks.sh"
+source "$SCRIPT_DIR/lib-terminology.sh"
 
 bl_require_rules || exit 0
 
 MSG_FILE="$1"
 if [ -z "$MSG_FILE" ] || [ ! -f "$MSG_FILE" ]; then
-  echo "check-commit-msg-bl: no message file provided" >&2
+  echo "check-commit-msg: no message file provided" >&2
   exit 1
 fi
 

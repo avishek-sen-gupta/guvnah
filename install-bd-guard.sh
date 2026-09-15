@@ -1,7 +1,6 @@
 #!/bin/sh
-# install-bd-guard-bl.sh — betterleaks-backed Beads terminology guard installer.
+# install-bd-guard.sh — betterleaks-backed Beads terminology guard installer.
 # Run from the root of the project you want to wire (it must have a .claude/ directory).
-# Coexists with install-bd-guard.sh.
 # Requires: jq, betterleaks
 
 set -e
@@ -23,10 +22,10 @@ if [ ! -d "$PROJECT_DIR/.claude" ]; then
 fi
 
 # --- install hook ---
-echo "Installing bd-guard-bl hook..."
+echo "Installing bd-terminology-guard hook..."
 mkdir -p ~/.claude/plugins/guvnah/hooks
-cp "$PLUGIN_DIR/hooks/bd-guard-bl.sh" ~/.claude/plugins/guvnah/hooks/
-chmod +x ~/.claude/plugins/guvnah/hooks/bd-guard-bl.sh
+cp "$PLUGIN_DIR/hooks/bd-terminology-guard.sh" ~/.claude/plugins/guvnah/hooks/
+chmod +x ~/.claude/plugins/guvnah/hooks/bd-terminology-guard.sh
 
 # --- create settings.json if missing ---
 if [ ! -f "$SETTINGS" ]; then
@@ -34,15 +33,15 @@ if [ ! -f "$SETTINGS" ]; then
 fi
 
 # --- wire PreToolUse hook (idempotent) ---
-HAS_HOOK=$(jq '[.hooks.PreToolUse[]?.hooks[]?.command // ""] | any(contains("bd-guard-bl"))' "$SETTINGS")
+HAS_HOOK=$(jq '[.hooks.PreToolUse[]?.hooks[]?.command // ""] | any(contains("bd-terminology-guard"))' "$SETTINGS")
 if [ "$HAS_HOOK" = "false" ]; then
-  echo "Wiring bd-guard-bl PreToolUse hook..."
-  HOOK_ENTRY='{"hooks": [{"type": "command", "command": "~/.claude/plugins/guvnah/hooks/bd-guard-bl.sh"}]}'
+  echo "Wiring bd-terminology-guard PreToolUse hook..."
+  HOOK_ENTRY='{"hooks": [{"type": "command", "command": "~/.claude/plugins/guvnah/hooks/bd-terminology-guard.sh"}]}'
   jq --argjson entry "$HOOK_ENTRY" \
     '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [$entry])' \
     "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
 else
-  echo "bd-guard-bl hook already wired, skipping."
+  echo "bd-terminology-guard hook already wired, skipping."
 fi
 
 if ! command -v betterleaks > /dev/null 2>&1; then
