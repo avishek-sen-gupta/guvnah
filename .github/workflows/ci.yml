@@ -24,6 +24,15 @@ jobs:
           uv pip install ruff
           npm install -g @ast-grep/cli
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Install betterleaks
+        run: |
+          go install github.com/betterleaks/betterleaks@v1.8.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
       - name: Add venv to PATH
         run: echo "${{ github.workspace }}/.venv/bin" >> "$GITHUB_PATH"
 

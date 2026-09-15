@@ -105,6 +105,40 @@ Scans the full git history (file contents + commit messages) for forbidden terms
 
 Uninstall: `/path/to/guvnah/uninstall-terminology-guard.sh`
 
+### Betterleaks Terminology Guard (parity trial)
+
+A [betterleaks](https://github.com/betterleaks/betterleaks)-backed replacement for the Git and Beads terminology guards. It installs alongside the grep-based guards (distinct script names, hook ids and hook files) so both can run until parity is verified. Requires `brew install betterleaks`.
+
+**1. Generate the rules file** from the existing blocklist (one rule matching every term case-insensitively; `blocklist-exclude.txt` globs become a path prefilter):
+```bash
+/path/to/guvnah/hooks/betterleaks/blocklist-to-toml > ~/.config/git/terminology.toml
+```
+
+**2. Git hooks:**
+```bash
+cd /path/to/your/project
+/path/to/guvnah/install-betterleaks-guard.sh
+pre-commit install --hook-type pre-commit --hook-type commit-msg
+```
+
+Installs `check-terminology-bl`, `check-commit-msg-bl`, `scan-history-bl`, `blocklist-to-toml` and `lib-betterleaks.sh` → `precommit-scripts/`, and wires `bl-terminology-guard` (pre-commit) and `bl-terminology-commit-msg` (commit-msg) into `.pre-commit-config.yaml`.
+
+- Staged content: `betterleaks git --pre-commit --staged`
+- Commit message: `betterleaks stdin < <message file>`
+- History: `precommit-scripts/scan-history-bl` runs `betterleaks git` over all commits, then pipes every commit message line (prefixed with its short SHA) through `betterleaks stdin`
+
+Uninstall: `/path/to/guvnah/uninstall-betterleaks-guard.sh`
+
+**3. Beads hook:**
+```bash
+cd /path/to/your/project
+/path/to/guvnah/install-bd-guard-bl.sh
+```
+
+Installs `bd-guard-bl.sh` → `~/.claude/plugins/guvnah/hooks/` and wires a `PreToolUse` hook. Uninstall: `/path/to/guvnah/uninstall-bd-guard-bl.sh`
+
+With no `terminology.toml` all betterleaks hooks allow (as the grep-based guards do with no blocklist); with the rules present but `betterleaks` missing, they block.
+
 ### All tools
 
 You can install each tool independently — they use separate lock files and hooks and don't conflict.
