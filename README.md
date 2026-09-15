@@ -101,7 +101,7 @@ cd /path/to/your/project
 /path/to/guvnah/install-terminology-guard.sh
 ```
 
-Installs `check-terminology`, `check-commit-msg`, `scan-history`, `blocklist-to-toml` and `lib-terminology.sh` → `precommit-scripts/`, wires `terminology-guard` (pre-commit) and `terminology-commit-msg` (commit-msg) into `.pre-commit-config.yaml`, and runs `pre-commit install --hook-type pre-commit --hook-type commit-msg` (warning instead if pre-commit is unavailable). Re-running replaces existing entries, so it also upgrades older installs.
+Installs `check-terminology`, `check-commit-msg`, `scan-history`, `blocklist-to-toml` and `lib-terminology.sh` → `precommit-scripts/`, wires `terminology-guard` (pre-commit) and `terminology-commit-msg` (commit-msg) into `.pre-commit-config.yaml`, and runs `pre-commit install --hook-type pre-commit --hook-type commit-msg`. pre-commit refuses to install while `core.hooksPath` is set: a local value pointing at the repo's own `.git/hooks` is removed automatically; any other value is left alone and the installer warns that the hooks are NOT activated. Re-running replaces existing entries, so it also upgrades older installs.
 
 - Staged content: `betterleaks git --pre-commit --staged`
 - Commit message: `betterleaks stdin < <message file>`
