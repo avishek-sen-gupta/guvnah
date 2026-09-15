@@ -16,6 +16,7 @@ import stat
 import subprocess
 
 import pytest
+import yaml
 
 pytestmark = pytest.mark.skipif(
     shutil.which("betterleaks") is None, reason="betterleaks not installed"
@@ -379,9 +380,107 @@ def read_config(repo: str) -> str:
 
 
 def run_installer(script: str, repo: str, home: str) -> subprocess.CompletedProcess:
+    # Keep uv's real cache: the fake HOME would otherwise re-download ruamel.yaml per test.
+    env = {
+        "UV_CACHE_DIR": os.path.expanduser("~/.cache/uv"),
+        **env_for(home),
+    }
     return subprocess.run(
-        ["bash", script], cwd=repo, env=env_for(home), capture_output=True, text=True
+        ["bash", script], cwd=repo, env=env, capture_output=True, text=True
     )
+
+
+def write_config(repo: str, content: str) -> None:
+    with open(os.path.join(repo, ".pre-commit-config.yaml"), "w") as f:
+        f.write(content)
+
+
+def hook_ids_by_repo(repo: str) -> list[list[str]]:
+    """Hook ids per repo entry; fails if any repo's hooks is null or empty."""
+    repos = yaml.safe_load(read_config(repo))["repos"]
+    ids = [[hook["id"] for hook in entry["hooks"]] for entry in repos]
+    assert all(ids), f"repo entry with no hooks: {ids}"
+    return ids
+
+
+BLACK_THEN_JAVA = """\
+repos:
+  # Python formatting
+  - repo: local
+    hooks:
+      - id: black
+        name: black
+        entry: black
+        language: system
+
+  # Java formatting (google-java-format)
+  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: v2.14.0
+    hooks:
+      - id: pretty-format-java
+        args: [--autofix]
+"""
+
+# The shape an older installer left behind: hooks spliced into black's repo under
+# the Java comment, and emptied `repo: local` entries whose hooks parse as null.
+MISPLACED_HOOKS = """\
+repos:
+  # Python formatting
+  - repo: local
+    hooks:
+      - id: black
+        name: black
+        entry: black
+        language: system
+
+  # Java formatting (google-java-format)
+
+      - id: terminology-guard
+        name: Terminology Guard
+        entry: precommit-scripts/check-terminology
+        language: script
+        pass_filenames: false
+        always_run: true
+
+  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: v2.14.0
+    hooks:
+      - id: pretty-format-java
+        args: [--autofix]
+
+  # Terminology guard — blocks forbidden terms in staged diffs
+  - repo: local
+    hooks:
+
+  # Terminology guard — blocks forbidden terms in commit messages
+  - repo: local
+    hooks:
+"""
+
+TERMINOLOGY_THEN_JAVA = """\
+repos:
+  # Terminology guard
+  - repo: local
+    hooks:
+      - id: terminology-guard
+        name: Terminology Guard
+        entry: precommit-scripts/check-terminology
+        language: script
+        pass_filenames: false
+        always_run: true
+      - id: terminology-commit-msg
+        name: Terminology Guard (commit message)
+        entry: precommit-scripts/check-commit-msg
+        language: script
+        stages: [commit-msg]
+
+  # Java formatting (google-java-format)
+  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: v2.14.0
+    hooks:
+      - id: pretty-format-java
+        args: [--autofix]
+"""
 
 
 class TestInstallTerminologyGuard:
@@ -446,6 +545,43 @@ class TestInstallTerminologyGuard:
         assert "types: [text]" not in config
         assert "id: pytest\n" in config
 
+    def test_wires_hooks_in_their_own_local_repo(self, tmp_path):
+        repo = init_git_repo(str(tmp_path / "repo"))
+        write_config(repo, BLACK_THEN_JAVA)
+        result = run_installer(INSTALL, repo, str(tmp_path / "home"))
+        assert result.returncode == 0, result.stderr
+        assert hook_ids_by_repo(repo) == [
+            ["black"],
+            ["pretty-format-java"],
+            ["terminology-guard", "terminology-commit-msg"],
+        ]
+
+    def test_repairs_misplaced_hooks_and_empty_local_repos(self, tmp_path):
+        repo = init_git_repo(str(tmp_path / "repo"))
+        write_config(repo, MISPLACED_HOOKS)
+        result = run_installer(INSTALL, repo, str(tmp_path / "home"))
+        assert result.returncode == 0, result.stderr
+        assert hook_ids_by_repo(repo) == [
+            ["black"],
+            ["pretty-format-java"],
+            ["terminology-guard", "terminology-commit-msg"],
+        ]
+
+    def test_reinstall_leaves_config_unchanged(self, tmp_path):
+        repo = init_git_repo(str(tmp_path / "repo"))
+        home = str(tmp_path / "home")
+        write_config(repo, BLACK_THEN_JAVA)
+        run_installer(INSTALL, repo, home)
+        first = read_config(repo)
+        run_installer(INSTALL, repo, home)
+        assert read_config(repo) == first
+
+    def test_reinstall_keeps_comments_after_the_terminology_repo(self, tmp_path):
+        repo = init_git_repo(str(tmp_path / "repo"))
+        write_config(repo, TERMINOLOGY_THEN_JAVA)
+        run_installer(INSTALL, repo, str(tmp_path / "home"))
+        assert read_config(repo) == TERMINOLOGY_THEN_JAVA
+
     def test_does_not_add_consecutive_blank_lines(self, tmp_path):
         repo = init_git_repo(str(tmp_path / "repo"))
         home = str(tmp_path / "home")
@@ -485,6 +621,13 @@ class TestUninstallTerminologyGuard:
         config = read_config(repo)
         assert "id: pytest\n" in config
         assert "terminology" not in config
+
+    def test_drops_local_repos_left_without_hooks(self, tmp_path):
+        repo = init_git_repo(str(tmp_path / "repo"))
+        write_config(repo, MISPLACED_HOOKS)
+        result = run_installer(UNINSTALL, repo, str(tmp_path / "home"))
+        assert result.returncode == 0, result.stderr
+        assert hook_ids_by_repo(repo) == [["black"], ["pretty-format-java"]]
 
 
 # ── install / uninstall: bd guard ────────────────────────────────

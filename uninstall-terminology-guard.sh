@@ -4,6 +4,7 @@
 
 set -e
 
+PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$PWD"
 SCRIPTS_DIR="$PROJECT_DIR/precommit-scripts"
 CONFIG="$PROJECT_DIR/.pre-commit-config.yaml"
@@ -16,31 +17,16 @@ fi
 
 # --- remove from .pre-commit-config.yaml ---
 if [ -f "$CONFIG" ]; then
+  if ! command -v uv > /dev/null 2>&1; then
+    echo "Error: uv is required to edit .pre-commit-config.yaml (brew install uv)." >&2
+    exit 1
+  fi
   echo "Removing betterleaks terminology hooks from .pre-commit-config.yaml..."
-  CONFIG="$CONFIG" python3 - <<'EOF'
-import os, re
-
-config = os.environ["CONFIG"]
-content = open(config).read()
-
-# Remove each hook entry: its '- id:' line plus the lines indented deeper than the dash.
-for hook_id in ["terminology-guard", "terminology-commit-msg"]:
-    content = re.sub(
-        r"\n?([ \t]*)- id: " + re.escape(hook_id) + r"[ \t]*\n(?:\1[ \t]+[^\n]*\n)*",
-        "\n",
-        content,
-    )
-
-# Remove repo: local blocks whose hooks: section is now empty
-content = re.sub(r"\n  - repo: local\n    hooks:\n(?:[ \t]*\n)*(?=  - repo:|\Z)", "\n", content)
-content = re.sub(r"\n{3,}", "\n\n", content)
-
-if "id:" in content:
-    open(config, "w").write(content)
-else:
-    os.remove(config)
-    print(".pre-commit-config.yaml was empty after removal — deleted.")
-EOF
+  "$PLUGIN_DIR/hooks/terminology/wire-precommit-config" remove "$CONFIG"
+  if ! grep -q "id:" "$CONFIG"; then
+    rm -f "$CONFIG"
+    echo ".pre-commit-config.yaml was empty after removal — deleted."
+  fi
 else
   echo "No .pre-commit-config.yaml found, skipping."
 fi

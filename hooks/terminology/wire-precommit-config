@@ -1,0 +1,133 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["ruamel.yaml>=0.18"]
+# ///
+"""Add or remove the terminology guard hooks in a .pre-commit-config.yaml.
+
+Usage: wire-precommit-config add|remove <config path>
+
+Edits the file as YAML (ruamel round-trip, so comments and formatting survive)
+rather than by splicing lines: a regex-edited config is easy to leave in a state
+that parses but is wrong — hooks under the wrong repo, or an emptied `hooks:`
+key that YAML reads as null and pre-commit refuses to load.
+
+`add` is idempotent. It keeps the hooks where they already are, so re-running
+never reshuffles a config, and repairs configs an older installer mangled:
+terminology hooks are removed from any other repo, and a `repo: local` left
+without hooks is dropped.
+"""
+
+import sys
+
+from ruamel.yaml import YAML
+
+HOOK_IDS = ("terminology-guard", "terminology-commit-msg")
+
+HOOKS = """\
+- id: terminology-guard
+  name: Terminology Guard
+  entry: precommit-scripts/check-terminology
+  language: script
+  pass_filenames: false
+  always_run: true
+- id: terminology-commit-msg
+  name: Terminology Guard (commit message)
+  entry: precommit-scripts/check-commit-msg
+  language: script
+  stages: [commit-msg]
+"""
+
+EMPTY = "repos:\n"
+
+
+def yaml_parser() -> YAML:
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    yaml.width = 4096  # long `entry:` commands must not be wrapped
+    yaml.indent(mapping=2, sequence=4, offset=2)
+    return yaml
+
+
+def is_ours(entry) -> bool:
+    """True for a `repo: local` entry holding nothing but terminology hooks."""
+    hooks = entry.get("hooks")
+    return (
+        entry.get("repo") == "local"
+        and bool(hooks)
+        and all(hook.get("id") in HOOK_IDS for hook in hooks)
+    )
+
+
+def strip_hooks(repos, keep=None) -> None:
+    """Remove terminology hooks from every repo but `keep`, dropping empties."""
+    for entry in repos:
+        if entry is keep or not entry.get("hooks"):
+            continue
+        hooks = entry["hooks"]
+        for i in reversed(range(len(hooks))):
+            if hooks[i].get("id") in HOOK_IDS:
+                del hooks[i]
+    for i in reversed(range(len(repos))):
+        entry = repos[i]
+        if entry is not keep and entry.get("repo") == "local" and not entry.get("hooks"):
+            del repos[i]
+
+
+def overwrite(existing, wanted) -> None:
+    """Update a hook mapping in place, so its attached comments survive."""
+    for key in [k for k in existing if k not in wanted]:
+        del existing[key]
+    for key, value in wanted.items():
+        existing[key] = value
+
+
+def add(doc, wanted) -> None:
+    repos = doc["repos"]
+    ours = next((entry for entry in repos if is_ours(entry)), None)
+    strip_hooks(repos, keep=ours)
+    if ours is None:
+        repos.append({"repo": "local", "hooks": wanted})
+        return
+    # Rewrite in place rather than replacing the list: the blank line and comment
+    # introducing the *next* repo hang off the last hook of this one.
+    hooks = ours["hooks"]
+    for index, hook in enumerate(wanted):
+        existing = next((h for h in hooks if h.get("id") == hook["id"]), None)
+        if existing is None:
+            hooks.insert(index, hook)
+        else:
+            overwrite(existing, hook)
+
+
+def main() -> int:
+    if len(sys.argv) != 3 or sys.argv[1] not in ("add", "remove"):
+        print(__doc__.splitlines()[2], file=sys.stderr)
+        return 2
+    action, path = sys.argv[1], sys.argv[2]
+
+    yaml = yaml_parser()
+    try:
+        with open(path) as f:
+            content = f.read()
+    except FileNotFoundError:
+        if action == "remove":
+            return 0
+        content = EMPTY
+
+    doc = yaml.load(content) or yaml.load(EMPTY)
+    if not doc.get("repos"):
+        doc["repos"] = []
+
+    if action == "add":
+        add(doc, yaml.load(HOOKS))
+    else:
+        strip_hooks(doc["repos"])
+
+    with open(path, "w") as f:
+        yaml.dump(doc, f)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

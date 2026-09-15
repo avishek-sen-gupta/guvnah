@@ -27,58 +27,13 @@ chmod +x "$SCRIPTS_DIR/check-terminology" "$SCRIPTS_DIR/check-commit-msg" \
   "$SCRIPTS_DIR/scan-history" "$SCRIPTS_DIR/blocklist-to-toml"
 
 # --- wire .pre-commit-config.yaml (idempotent) ---
-# wire_hook <id> <hook block>: puts the block in the first `repo: local` entry,
-# creating the entry (or the whole file) when absent. An existing entry with the
-# same id is replaced, so re-running upgrades hooks wired by older installs.
-wire_hook() {
-  echo "Wiring $1 in .pre-commit-config.yaml..."
-  HOOK_ID="$1" HOOK_BLOCK="$2" CONFIG="$CONFIG" python3 - <<'EOF'
-import os, re
+if ! command -v uv > /dev/null 2>&1; then
+  echo "Error: uv is required to edit .pre-commit-config.yaml (brew install uv)." >&2
+  exit 1
+fi
 
-config = os.environ["CONFIG"]
-hook_id, block = os.environ["HOOK_ID"], os.environ["HOOK_BLOCK"]
-content = open(config).read() if os.path.isfile(config) else "repos:\n"
-
-# Drop any existing entry for this id: its '- id:' line plus the lines indented deeper than the dash.
-content = re.sub(
-    r"\n?([ \t]*)- id: " + re.escape(hook_id) + r"[ \t]*\n(?:\1[ \t]+[^\n]*\n)*",
-    "\n",
-    content,
-)
-if not content.endswith("\n"):
-    content += "\n"
-lines = content.splitlines(keepends=True)
-
-local_idx = next((i for i, l in enumerate(lines) if re.search(r"repo:\s*local", l)), None)
-if local_idx is None:
-    lines += ["\n", "  - repo: local\n", "    hooks:\n", block]
-else:
-    insert_at = next(
-        (i for i in range(local_idx + 1, len(lines)) if re.match(r"\s*- repo:", lines[i])),
-        len(lines),
-    )
-    while insert_at > local_idx + 1 and lines[insert_at - 1].strip() == "":
-        insert_at -= 1
-    lines.insert(insert_at, "\n" + block)
-
-open(config, "w").write(re.sub(r"\n{3,}", "\n\n", "".join(lines)))
-EOF
-}
-
-wire_hook terminology-guard "      - id: terminology-guard
-        name: Terminology Guard
-        entry: precommit-scripts/check-terminology
-        language: script
-        pass_filenames: false
-        always_run: true
-"
-
-wire_hook terminology-commit-msg "      - id: terminology-commit-msg
-        name: Terminology Guard (commit message)
-        entry: precommit-scripts/check-commit-msg
-        language: script
-        stages: [commit-msg]
-"
+echo "Wiring terminology hooks in .pre-commit-config.yaml..."
+"$PLUGIN_DIR/hooks/terminology/wire-precommit-config" add "$CONFIG"
 
 # --- activate the hooks in .git/hooks ---
 PRE_COMMIT_CMD="pre-commit install --hook-type pre-commit --hook-type commit-msg"
