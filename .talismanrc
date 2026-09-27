@@ -1,1 +1,9 @@
 threshold: low
+fileignoreconfig:
+- filename: tests/test_install_guards.py
+  checksum: fafab5b40ee4255b8e3f70e671cb0349f0b01390373e7ccba3611b8c7076f42e
+- filename: tests/test_terminology_guard.py
+  checksum: 640498a8a1f086933f87d73e5776005c1ffa9474d626d00a7545af72108c09ea
+- filename: tests/gitenv.py
+  checksum: fe23032b3dcaa66c7913c4de2d1f92ddaf2a72c2541b476a840cf57c9b545009
+version: "1.0"

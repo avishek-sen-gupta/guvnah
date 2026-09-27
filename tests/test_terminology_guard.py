@@ -18,6 +18,8 @@ import subprocess
 import pytest
 import yaml
 
+from tests.gitenv import clean_env
+
 pytestmark = pytest.mark.skipif(
     shutil.which("betterleaks") is None, reason="betterleaks not installed"
 )
@@ -40,7 +42,12 @@ UNINSTALL_BD = os.path.join(REPO_ROOT, "uninstall-bd-guard.sh")
 
 def git(repo: str, *args: str) -> str:
     return subprocess.run(
-        ["git", *args], cwd=repo, check=True, capture_output=True, text=True
+        ["git", *args],
+        cwd=repo,
+        env=clean_env(),
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout
 
 
@@ -72,7 +79,7 @@ def stage_content(repo: str, content: str, filename: str = "file.txt") -> None:
 
 
 def env_for(home: str) -> dict:
-    return {**os.environ, "HOME": home}
+    return clean_env(HOME=home)
 
 
 def write_blocklist(tmp_path, patterns: list[str], excludes=None) -> str:
@@ -468,6 +475,7 @@ repos:
         language: script
         pass_filenames: false
         always_run: true
+        stages: [pre-commit]
       - id: terminology-commit-msg
         name: Terminology Guard (commit message)
         entry: precommit-scripts/check-commit-msg
@@ -481,6 +489,43 @@ repos:
       - id: pretty-format-java
         args: [--autofix]
 """
+
+
+class TestFixtureIsolation:
+    """The suite runs inside a pre-commit hook, which is a hostile environment.
+
+    Git exports GIT_DIR, GIT_INDEX_FILE, GIT_WORK_TREE and GIT_AUTHOR_* to the hooks
+    it runs, and those override a subprocess `cwd=`. A fixture that trusts cwd will
+    operate on the repo being committed instead of its own tmp_path.
+    """
+
+    def test_git_helper_ignores_inherited_git_env(self, tmp_path, monkeypatch):
+        decoy = tmp_path / "decoy"
+        decoy.mkdir()
+        monkeypatch.setenv("GIT_DIR", str(decoy))
+        monkeypatch.setenv("GIT_INDEX_FILE", str(decoy / "index"))
+        monkeypatch.setenv("GIT_WORK_TREE", str(decoy))
+        monkeypatch.setenv("GIT_AUTHOR_NAME", "leak")
+        monkeypatch.setenv("GIT_AUTHOR_EMAIL", "leak@example.com")
+
+        repo = init_git_repo(str(tmp_path / "repo"))
+
+        assert os.path.isdir(os.path.join(repo, ".git")), "fixture repo not created"
+        assert sorted(p.name for p in decoy.iterdir()) == [], "wrote to the decoy repo"
+        author = git(repo, "log", "-1", "--format=%an <%ae>").strip()
+        assert author == "T <t@t.com>", "inherited GIT_AUTHOR_* leaked into the fixture"
+
+    def test_installer_env_ignores_inherited_git_env(self, tmp_path, monkeypatch):
+        decoy = tmp_path / "decoy"
+        decoy.mkdir()
+        monkeypatch.setenv("GIT_DIR", str(decoy))
+        monkeypatch.setenv("GIT_INDEX_FILE", str(decoy / "index"))
+
+        repo = init_git_repo(str(tmp_path / "repo"))
+        result = run_installer(INSTALL, repo, str(tmp_path / "home"))
+
+        assert result.returncode == 0, result.stderr
+        assert sorted(p.name for p in decoy.iterdir()) == [], "installer hit the decoy"
 
 
 class TestInstallTerminologyGuard:
@@ -503,6 +548,14 @@ class TestInstallTerminologyGuard:
         config = read_config(repo)
         assert config.count("id: terminology-guard\n") == 1
         assert config.count("id: terminology-commit-msg\n") == 1
+
+    def test_guard_hook_runs_only_at_pre_commit_stage(self, tmp_path):
+        """Without an explicit stage the guard fires at every installed hook type."""
+        repo = init_git_repo(str(tmp_path / "repo"))
+        run_installer(INSTALL, repo, str(tmp_path / "home"))
+        config = read_config(repo)
+        block = config.split("id: terminology-guard")[1].split("- id:")[0]
+        assert "stages: [pre-commit]" in block
 
     def test_commit_msg_hook_runs_at_commit_msg_stage(self, tmp_path):
         repo = init_git_repo(str(tmp_path / "repo"))

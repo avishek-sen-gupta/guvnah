@@ -31,6 +31,7 @@ HOOKS = """\
   language: script
   pass_filenames: false
   always_run: true
+  stages: [pre-commit]
 - id: terminology-commit-msg
   name: Terminology Guard (commit message)
   entry: precommit-scripts/check-commit-msg

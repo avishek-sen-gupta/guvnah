@@ -13,6 +13,8 @@ import json
 import os
 import subprocess
 
+from tests.gitenv import clean_env
+
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 INSTALL_TERMINOLOGY = os.path.join(REPO_ROOT, "install-terminology-guard.sh")
 INSTALL_GUARDS = os.path.join(REPO_ROOT, "install-guards.sh")
@@ -22,7 +24,9 @@ PRE_COMMIT_ARGS = "install --hook-type pre-commit --hook-type commit-msg"
 
 
 def git(repo: str, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", *args], cwd=repo, env=clean_env(), check=True, capture_output=True
+    )
 
 
 def make_project(tmp_path, with_claude: bool = True) -> str:
@@ -79,6 +83,7 @@ def hooks_path(project: str) -> str | None:
     result = subprocess.run(
         ["git", "config", "--local", "--get", "core.hooksPath"],
         cwd=project,
+        env=clean_env(),
         capture_output=True,
         text=True,
     )
@@ -88,11 +93,10 @@ def hooks_path(project: str) -> str | None:
 def run(
     script: str, project: str, tmp_path, bin_dir: str
 ) -> subprocess.CompletedProcess:
-    env = {
-        **os.environ,
-        "HOME": str(tmp_path / "home"),
-        "PATH": bin_dir + os.pathsep + os.environ["PATH"],
-    }
+    env = clean_env(
+        HOME=str(tmp_path / "home"),
+        PATH=bin_dir + os.pathsep + os.environ["PATH"],
+    )
     return subprocess.run(
         ["sh", script], cwd=project, env=env, capture_output=True, text=True
     )
@@ -130,6 +134,19 @@ def settings_commands(project: str) -> list[str]:
         for entry in settings.get("hooks", {}).get("PreToolUse", [])
         for h in entry["hooks"]
     ]
+
+
+def test_git_helper_ignores_inherited_git_env(tmp_path, monkeypatch):
+    """Git exports GIT_DIR/GIT_INDEX_FILE to its hooks; they override cwd=."""
+    decoy = tmp_path / "decoy"
+    decoy.mkdir()
+    monkeypatch.setenv("GIT_DIR", str(decoy))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(decoy / "index"))
+
+    project = make_project(tmp_path)
+
+    assert os.path.isdir(os.path.join(project, ".git")), "fixture repo not created"
+    assert sorted(p.name for p in decoy.iterdir()) == [], "wrote to the decoy repo"
 
 
 # ── install-terminology-guard.sh: pre-commit activation ──────────
