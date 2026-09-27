@@ -1,9 +1,13 @@
 repos:
+  # Every hook states its stages. With no default_stages, a hook that omits them
+  # runs at every installed hook type, so once commit-msg is installed the whole
+  # suite runs a second time against the commit message.
   - repo: https://github.com/psf/black
     rev: 24.4.2
     hooks:
       - id: black
         args: [tests]
+        stages: [pre-commit]
 
   - repo: local
     hooks:
@@ -13,6 +17,7 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+        stages: [pre-commit]
 
 
 
