@@ -3,7 +3,7 @@ repos:
   # runs at every installed hook type, so once commit-msg is installed the whole
   # suite runs a second time against the commit message.
   - repo: https://github.com/psf/black
-    rev: 24.4.2
+    rev: 26.5.1
     hooks:
       - id: black
         args: [tests]
